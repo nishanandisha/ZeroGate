@@ -57,8 +57,14 @@ def test_category_block_applies_to_everyone(swg):
 
 
 def test_group_policy_contractor_vs_employee(swg):
-    assert curl_code("client-wg", f"{swg('carol')} https://www.reddit.com").startswith("403")
-    assert not curl_code("client-wg", f"{swg('dave')} https://www.reddit.com").startswith("403")
+    """Judge by the gateway's own block marker, not the status code: the site itself may answer 403
+    (it does to cloud addresses such as CI runners), which says nothing about our policy."""
+    def blocked_by_gateway(user: str) -> bool:
+        headers = cexec("client-wg", f"curl -s -o /dev/null -D - --max-time 20 {swg(user)} https://www.reddit.com").stdout
+        assert "HTTP/" in headers, f"no response for {user}"
+        return "x-squid-error: err_access_denied" in headers.lower()
+    assert blocked_by_gateway("carol")
+    assert not blocked_by_gateway("dave")
 
 
 def test_untrusted_client_rejects_inspected_tls(swg):
