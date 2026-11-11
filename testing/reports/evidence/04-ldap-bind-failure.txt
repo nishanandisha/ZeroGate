@@ -1,0 +1,19 @@
+$ sh -c curl -s --max-time 10 -d grant_type=password -d client_id=zerogate-cli -d username=dave --data-urlencode 'password=<redacted>' http://localhost:8080/realms/zerogate/protocol/openid-connect/token
+{"error":"unknown_error","error_description":"For more on this error consult the server log."}
+$ sh -c docker logs --since 2m zerogate-keycloak-1 2>&1 | grep -iE 'AuthenticationException|LDAP: error code|LOGIN_ERROR' | tail -3 | cut -c1-260
+2026-11-11 16:43:05,395 WARN  [org.keycloak.events] (executor-thread-6) type="LOGIN_ERROR", realmId="01e2163e-e1ab-4003-9443-1a6e11bdb61b", realmName="zerogate", clientId="https://localhost:8443/mellon/metadata", userId="1944ddeb-af89-4a37-ab15-2300bf93d596", 
+Caused by: javax.naming.AuthenticationException: [LDAP: error code 49 - Invalid Credentials]
+Caused by: javax.naming.AuthenticationException: [LDAP: error code 49 - Invalid Credentials]
+
+$ sh -c docker logs --since 2m zerogate-openldap-1 2>&1 | grep -E 'BIND dn="cn=keycloak-svc|RESULT tag=97 err=49' | tail -4
+6af49b67.090fa094 0xffff3eef1ac0 conn=3421 op=0 BIND dn="cn=keycloak-svc,ou=services,dc=zerogate,dc=lab" method=128
+6af49b67.091dec15 0xffff3eef1ac0 conn=3421 op=0 RESULT tag=97 err=49 qtime=0.000020 etime=0.001381 text=
+6af49b67.0f945cb4 0xffff3eef1ac0 conn=3422 op=0 BIND dn="cn=keycloak-svc,ou=services,dc=zerogate,dc=lab" method=128
+6af49b67.0f9657dd 0xffff3eef1ac0 conn=3422 op=0 RESULT tag=97 err=49 qtime=0.000016 etime=0.000174 text=
+
+$ dc exec -T openldap ldapwhoami -x -H ldap://127.0.0.1 -D cn=keycloak-svc,ou=services,dc=zerogate,dc=lab -w <redacted>
+ldap_bind: Invalid credentials (49)
+
+$ dc exec -T openldap ldapwhoami -x -H ldap://127.0.0.1 -D uid=dave,ou=people,dc=zerogate,dc=lab -w <redacted>
+dn:uid=dave,ou=people,dc=zerogate,dc=lab
+

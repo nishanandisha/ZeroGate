@@ -1,0 +1,7 @@
+{
+  "id": "05-ipsec-proposal-mismatch",
+  "ticket": "TKT-005",
+  "component": "VPN / IPsec",
+  "title": "IKEv2 VPN fails to connect immediately",
+  "summary": "The client offers only legacy crypto (AES-128/SHA-1/DH group 2) that the gateway refuses: NO_PROPOSAL_CHOSEN."
+}

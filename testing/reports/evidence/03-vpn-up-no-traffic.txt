@@ -1,0 +1,30 @@
+$ dc exec -T client-wg sh -c wg show wg0 | grep -E 'endpoint|latest handshake|transfer'
+  endpoint: 172.30.0.10:51820
+  latest handshake: 1 minute, 46 seconds ago
+  transfer: 188.76 KiB received, 49.18 KiB sent
+
+$ dc exec -T client-wg sh -c ping -c2 -W2 10.10.0.40 | tail -2
+2 packets transmitted, 0 received, 100% packet loss, time 1012ms
+
+
+$ dc exec -T client-wg ip route get 10.10.0.40
+10.10.0.40 dev wg0 src 10.99.0.2 uid 0 
+    cache 
+
+$ dc exec -T vpn-gw sh -c cat /proc/sys/net/ipv4/ip_forward; iptables -L FORWARD -n -v | head -5
+1
+Chain FORWARD (policy DROP 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+  558  208K ACCEPT     0    --  *      *       0.0.0.0/0            0.0.0.0/0            ctstate RELATED,ESTABLISHED
+    7   588 ACCEPT     1    --  wg0    *       0.0.0.0/0            0.0.0.0/0           
+    2   120 ACCEPT     6    --  wg0    *       0.0.0.0/0            10.10.0.40           tcp dpt:443
+
+$ sh -c docker exec zerogate-client-wg-1 ping -c2 -W1 10.10.0.40 >/dev/null 2>&1 & docker exec zerogate-vpn-gw-1 timeout 4 tcpdump -ni any icmp -c 4 2>/dev/null
+16:43:54.292567 wg0   In  IP 10.99.0.2 > 10.10.0.40: ICMP echo request, id 70, seq 2, length 64
+16:43:54.292700 eth0  Out IP 10.99.0.2 > 10.10.0.40: ICMP echo request, id 70, seq 2, length 64
+
+
+$ dc exec -T vpn-gw iptables -t nat -L POSTROUTING -n -v
+Chain POSTROUTING (policy ACCEPT 0 packets, 0 bytes)
+ pkts bytes target     prot opt in     out     source               destination         
+

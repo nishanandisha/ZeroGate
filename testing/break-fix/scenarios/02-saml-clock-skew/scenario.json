@@ -1,0 +1,7 @@
+{
+  "id": "02-saml-clock-skew",
+  "ticket": "TKT-002",
+  "component": "IdP / SAML",
+  "title": "SSO login loops or fails right after entering the correct password",
+  "summary": "The service provider clock is 2 hours ahead, so every SAML assertion looks expired on arrival."
+}

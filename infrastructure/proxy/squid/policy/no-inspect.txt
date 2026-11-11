@@ -1,0 +1,5 @@
+# Privacy-sensitive categories: TLS is spliced (not decrypted)
+.chase.com
+.bankofamerica.com
+.healthcare.gov
+.example.net

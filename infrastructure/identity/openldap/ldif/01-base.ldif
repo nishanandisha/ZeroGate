@@ -1,0 +1,38 @@
+dn: dc=zerogate,dc=lab
+objectClass: dcObject
+objectClass: organization
+o: ZeroGate Lab
+dc: zerogate
+
+dn: ou=people,dc=zerogate,dc=lab
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=zerogate,dc=lab
+objectClass: organizationalUnit
+ou: groups
+
+dn: ou=services,dc=zerogate,dc=lab
+objectClass: organizationalUnit
+ou: services
+
+dn: cn=keycloak-svc,ou=services,dc=zerogate,dc=lab
+objectClass: organizationalRole
+objectClass: simpleSecurityObject
+cn: keycloak-svc
+description: Keycloak user federation bind account
+userPassword: __KEYCLOAK_SVC_PW__
+
+dn: cn=squid-svc,ou=services,dc=zerogate,dc=lab
+objectClass: organizationalRole
+objectClass: simpleSecurityObject
+cn: squid-svc
+description: Squid proxy-auth bind account
+userPassword: __SQUID_SVC_PW__
+
+dn: cn=console-svc,ou=services,dc=zerogate,dc=lab
+objectClass: organizationalRole
+objectClass: simpleSecurityObject
+cn: console-svc
+description: ZeroGate admin console read-only bind account
+userPassword: __CONSOLE_SVC_PW__

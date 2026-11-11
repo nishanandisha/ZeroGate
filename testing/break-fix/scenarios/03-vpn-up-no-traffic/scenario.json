@@ -1,0 +1,7 @@
+{
+  "id": "03-vpn-up-no-traffic",
+  "ticket": "TKT-003",
+  "component": "VPN / WireGuard",
+  "title": "VPN shows connected but nothing loads",
+  "summary": "The tunnel handshakes, but the gateway lost its NAT rule, so replies from the corporate network never find their way back."
+}

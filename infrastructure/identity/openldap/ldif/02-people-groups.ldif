@@ -1,0 +1,84 @@
+dn: uid=alice,ou=people,dc=zerogate,dc=lab
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: posixAccount
+uid: alice
+cn: Alice Anders
+givenName: Alice
+sn: Anders
+title: Security Engineer
+mail: alice@zerogate.lab
+uidNumber: 10001
+gidNumber: 10000
+homeDirectory: /home/alice
+loginShell: /bin/bash
+userPassword: __USER_PW__
+
+dn: uid=bob,ou=people,dc=zerogate,dc=lab
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: posixAccount
+uid: bob
+cn: Bob Brown
+givenName: Bob
+sn: Brown
+title: Finance Analyst
+mail: bob@zerogate.lab
+uidNumber: 10002
+gidNumber: 10000
+homeDirectory: /home/bob
+loginShell: /bin/bash
+userPassword: __USER_PW__
+
+dn: uid=carol,ou=people,dc=zerogate,dc=lab
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: posixAccount
+uid: carol
+cn: Carol Chen
+givenName: Carol
+sn: Chen
+title: Contractor
+mail: carol@zerogate.lab
+uidNumber: 10003
+gidNumber: 10000
+homeDirectory: /home/carol
+loginShell: /bin/bash
+userPassword: __USER_PW__
+
+dn: uid=dave,ou=people,dc=zerogate,dc=lab
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: posixAccount
+uid: dave
+cn: Dave Diaz
+givenName: Dave
+sn: Diaz
+title: Software Engineer
+mail: dave@zerogate.lab
+uidNumber: 10004
+gidNumber: 10000
+homeDirectory: /home/dave
+loginShell: /bin/bash
+userPassword: __USER_PW__
+
+dn: cn=zg-admins,ou=groups,dc=zerogate,dc=lab
+objectClass: groupOfNames
+cn: zg-admins
+member: uid=alice,ou=people,dc=zerogate,dc=lab
+
+dn: cn=engineering,ou=groups,dc=zerogate,dc=lab
+objectClass: groupOfNames
+cn: engineering
+member: uid=alice,ou=people,dc=zerogate,dc=lab
+member: uid=dave,ou=people,dc=zerogate,dc=lab
+
+dn: cn=finance,ou=groups,dc=zerogate,dc=lab
+objectClass: groupOfNames
+cn: finance
+member: uid=bob,ou=people,dc=zerogate,dc=lab
+
+dn: cn=contractors,ou=groups,dc=zerogate,dc=lab
+objectClass: groupOfNames
+cn: contractors
+member: uid=carol,ou=people,dc=zerogate,dc=lab

@@ -1,0 +1,20 @@
+$ sh -c '<repo>/testing/.venv/bin/python' '<repo>/testing/e2e/saml_login.py' alice '<redacted>' / | head -1
+400 https://localhost:8443/mellon/postResponse
+
+$ sh -c docker logs --tail 40 zerogate-saml-app-1 2>&1 | grep -iE 'auth_mellon|skew' | tail -6
+[app] WARNING: clock skew injected (+2h) -> apache sees Wed Nov 11 18:43:15 UTC 2026
+[Wed Nov 11 18:43:27.167947 2026] [auth_mellon:error] [pid 33:tid 33] [client 54.172.45.38:54528] NotOnOrAfter in SubjectConfirmationData was in the past.
+[Wed Nov 11 18:43:28.283750 2026] [auth_mellon:error] [pid 32:tid 32] [client 54.172.45.38:46810] NotOnOrAfter in SubjectConfirmationData was in the past.
+
+$ sh -c docker logs --since 2m zerogate-keycloak-1 2>&1 | grep -E 'type="LOGIN' | tail -2 | cut -c1-230
+2026-11-11 16:43:26,925 DEBUG [org.keycloak.events] (executor-thread-6) type="LOGIN", realmId="01e2163e-e1ab-4003-9443-1a6e11bdb61b", realmName="zerogate", clientId="https://localhost:8443/mellon/metadata", userId="1944ddeb-af89-4
+2026-11-11 16:43:28,043 DEBUG [org.keycloak.events] (executor-thread-6) type="LOGIN", realmId="01e2163e-e1ab-4003-9443-1a6e11bdb61b", realmName="zerogate", clientId="https://localhost:8443/mellon/metadata", userId="1944ddeb-af89-4
+
+$ sh -c echo host:      $(date -u +%FT%TZ); echo keycloak:  $(docker exec zerogate-keycloak-1 date -u +%FT%TZ); echo saml-app:  $(docker exec zerogate-saml-app-1 sh -c 'LD_PRELOAD=$(find /usr/lib -name libfaketime.so.1 | head -1) FAKETIME=${FAKETIME_OFFSET:-+0} date -u +%FT%TZ')
+host: 2026-11-11T16:43:28Z
+keycloak: 2026-11-11T16:43:28Z
+saml-app: 2026-11-11T18:43:28Z
+
+$ sh -c docker exec zerogate-saml-app-1 env | grep FAKETIME
+FAKETIME_OFFSET=+2h
+

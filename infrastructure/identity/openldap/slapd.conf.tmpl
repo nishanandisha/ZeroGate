@@ -1,0 +1,30 @@
+include   /etc/openldap/schema/core.schema
+include   /etc/openldap/schema/cosine.schema
+include   /etc/openldap/schema/inetorgperson.schema
+include   /etc/openldap/schema/nis.schema
+pidfile   /run/openldap/slapd.pid
+argsfile  /run/openldap/slapd.args
+modulepath /usr/lib/openldap
+moduleload back_mdb.so
+
+database  mdb
+maxsize   268435456
+suffix    "dc=zerogate,dc=lab"
+rootdn    "cn=admin,dc=zerogate,dc=lab"
+rootpw    __ROOT_PW__
+directory /var/lib/openldap/openldap-data
+index     objectClass eq
+index     uid,cn,mail,member eq
+
+
+# ACLs: least privilege. Service accounts read; users read; passwords only usable for bind.
+access to attrs=userPassword
+  by self write
+  by anonymous auth
+  by * none
+access to *
+  by dn.exact="cn=keycloak-svc,ou=services,dc=zerogate,dc=lab" read
+  by dn.exact="cn=squid-svc,ou=services,dc=zerogate,dc=lab" read
+  by dn.exact="cn=console-svc,ou=services,dc=zerogate,dc=lab" read
+  by users read
+  by * none

@@ -1,0 +1,173 @@
+# ZeroGate lab - see docs/architecture/ARCHITECTURE.md for the IP plan.
+name: zerogate
+
+x-pki: &pki ./pki:/pki:ro
+
+networks:
+  public:   # simulated internet / underlay
+    ipam: { config: [ { subnet: 172.30.0.0/24 } ] }
+  edge:     # DMZ: gateways + proxies (has real internet egress via Docker NAT)
+    ipam: { config: [ { subnet: 10.20.0.0/24 } ] }
+  corp:     # private apps + identity
+    ipam: { config: [ { subnet: 10.10.0.0/24 } ] }
+
+volumes:
+  ldap-data:
+  squid-logs:
+  mitm-logs:
+  vpn-status:
+
+services:
+  # ---------------- Identity ----------------
+  openldap:
+    build: ./identity/openldap
+    hostname: ldap.zerogate.lab
+    environment:
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD}
+      LAB_USER_PASSWORD: ${LAB_USER_PASSWORD}
+      LDAP_KEYCLOAK_PASSWORD: ${LDAP_KEYCLOAK_PASSWORD}
+      LDAP_SQUID_PASSWORD: ${LDAP_SQUID_PASSWORD}
+      LDAP_CONSOLE_PASSWORD: ${LDAP_CONSOLE_PASSWORD}
+    volumes: [ "ldap-data:/var/lib/openldap/openldap-data" ]
+    networks: { corp: { ipv4_address: 10.10.0.20 } }
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    command: [ "start-dev", "--import-realm" ]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_LOG_LEVEL: info,org.keycloak.events:debug
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=60"
+      LDAP_KEYCLOAK_PASSWORD: ${LDAP_KEYCLOAK_PASSWORD}
+    volumes: [ "./identity/keycloak/realms:/opt/keycloak/data/import:ro" ]
+    ports: [ "8080:8080" ]
+    mem_limit: 1200m
+    depends_on: [ openldap ]
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    networks: { corp: { ipv4_address: 10.10.0.30 } }
+
+  # ---------------- Private app (SAML SP) ----------------
+  saml-app:
+    build: ./apps/saml-protected-app
+    hostname: app.zerogate.lab
+    environment:
+      IDP_METADATA_URL: http://10.10.0.30:8080/realms/zerogate/protocol/saml/descriptor
+      SP_BASE_URL: https://localhost:8443
+      FAKETIME_OFFSET: ${SAML_APP_FAKETIME_OFFSET:-}
+    volumes: [ *pki ]
+    ports: [ "8443:443" ]
+    depends_on: { keycloak: { condition: service_healthy } }
+    networks: { corp: { ipv4_address: 10.10.0.40 } }
+
+  # ---------------- VPN gateways ----------------
+  vpn-gw:
+    build: ./vpn/wireguard
+    hostname: vpn-gw
+    cap_add: [ NET_ADMIN ]
+    sysctls: { net.ipv4.ip_forward: "1" }
+    environment:
+      WG_PUBLIC_ENDPOINT: ${WG_PUBLIC_ENDPOINT:-172.30.0.10}
+    volumes:
+      - ./vpn/wireguard/config:/config
+      - vpn-status:/status
+    ports: [ "51820:51820/udp" ]
+    networks:
+      public: { ipv4_address: 172.30.0.10 }
+      edge:   { ipv4_address: 10.20.0.10 }
+      corp:   { ipv4_address: 10.10.0.10 }
+
+  ipsec-gw:
+    build: ./vpn/ipsec-strongswan
+    hostname: vpn.zerogate.lab
+    cap_add: [ NET_ADMIN ]
+    sysctls: { net.ipv4.ip_forward: "1" }
+    environment: { ROLE: gateway }
+    volumes: [ *pki, "vpn-status:/status" ]
+    ports: [ "500:500/udp", "4500:4500/udp" ]
+    networks:
+      public: { ipv4_address: 172.30.0.11 }
+      edge:   { ipv4_address: 10.20.0.11 }
+      corp:   { ipv4_address: 10.10.0.11 }
+
+  # ---------------- Inspection ----------------
+  squid:
+    build: ./proxy/squid
+    hostname: proxy.zerogate.lab
+    environment:
+      LDAP_SQUID_PASSWORD: ${LDAP_SQUID_PASSWORD}
+    volumes: [ *pki, "squid-logs:/var/log/squid" ]
+    depends_on: [ openldap ]
+    networks:
+      edge: { ipv4_address: 10.20.0.20 }
+      corp: { ipv4_address: 10.10.0.21 }
+
+  mitmproxy:
+    build: ./proxy/mitmproxy
+    hostname: dlp.zerogate.lab
+    environment:
+      MITM_SEND_CHAIN: ${MITM_SEND_CHAIN:-true}   # false = TKT-007 (intermediate missing from chain)
+    volumes: [ *pki, "mitm-logs:/logs" ]
+    networks: { edge: { ipv4_address: 10.20.0.21 } }
+
+  # ---------------- Clients ----------------
+  client-wg:
+    build: ./clients/linux
+    hostname: client-wg
+    init: true   # reap zombie processes (killed VPN daemons)
+    cap_add: [ NET_ADMIN ]
+    environment: { MODE: wireguard, LAB_USER: alice, LAB_USER_PASSWORD: "${LAB_USER_PASSWORD}" }
+    volumes: [ *pki, "./vpn/wireguard/config/clients:/wg:ro" ]
+    depends_on: [ vpn-gw ]
+    networks: { public: { ipv4_address: 172.30.0.100 } }
+
+  client-ipsec:
+    build: ./clients/linux
+    hostname: client-ipsec
+    init: true   # reap zombie processes (killed VPN daemons)
+    cap_add: [ NET_ADMIN ]
+    environment: { MODE: ipsec, LAB_USER: bob, LAB_USER_PASSWORD: "${LAB_USER_PASSWORD}" }
+    volumes: [ *pki ]
+    depends_on: [ ipsec-gw ]
+    networks: { public: { ipv4_address: 172.30.0.101 } }
+
+  # ---------------- Control plane ----------------
+  backend:
+    build: ../backend
+    environment:
+      LDAP_URL: ldap://10.10.0.20:389
+      LDAP_BIND_DN: cn=console-svc,ou=services,dc=zerogate,dc=lab
+      LDAP_BIND_PASSWORD: ${LDAP_CONSOLE_PASSWORD}
+      KEYCLOAK_INTERNAL_URL: http://10.10.0.30:8080
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/zerogate
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      PKI_DIR: /pki
+      TICKETS_DIR: /data/tickets
+      SCENARIOS_DIR: /data/scenarios
+      SQUID_LOG: /logs/squid/access.log
+      MITM_LOG: /logs/mitm/flows.jsonl
+      STATUS_DIR: /status
+    volumes:
+      - *pki
+      - ../tickets:/data/tickets:ro
+      - ../testing/break-fix/scenarios:/data/scenarios:ro
+      - squid-logs:/logs/squid:ro
+      - mitm-logs:/logs/mitm:ro
+      - vpn-status:/status:ro
+    ports: [ "8800:8000" ]
+    networks:
+      corp: { ipv4_address: 10.10.0.50 }
+      edge: { ipv4_address: 10.20.0.50 }
+
+  frontend:
+    build: ../frontend
+    ports: [ "3300:80" ]
+    depends_on: [ backend ]
+    networks: { corp: { ipv4_address: 10.10.0.60 } }

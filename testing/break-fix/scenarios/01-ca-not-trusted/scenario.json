@@ -1,0 +1,7 @@
+{
+  "id": "01-ca-not-trusted",
+  "ticket": "TKT-001",
+  "component": "Proxy / Client",
+  "title": "HTTPS sites show certificate errors behind the proxy",
+  "summary": "The endpoint is missing the ZeroGate Root CA, so certificates re-signed by the inspection proxy are rejected."
+}

@@ -1,0 +1,7 @@
+{
+  "id": "06-idp-key-rotation",
+  "ticket": "TKT-006",
+  "component": "IdP / SAML",
+  "title": "SSO to one app broke overnight; other apps are fine",
+  "summary": "The IdP rotated its signing key. This app still holds the old IdP metadata, so it rejects the new signature."
+}

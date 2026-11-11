@@ -1,0 +1,44 @@
+# ---- secrets: never commit ----
+.env
+.env.*
+!.env.example
+infrastructure/.env
+
+# Generated PKI (private keys, CA bundles that embed keys, certs, serials).
+# Everything here is rebuilt by `make init` / scripts/pki.sh.
+infrastructure/pki/root-ca/
+infrastructure/pki/intermediate-ca/
+infrastructure/pki/issued/
+*.key
+*.pem
+*.p12
+*.pfx
+*.psk
+*.jks
+
+# Generated WireGuard keys and peer configs
+infrastructure/vpn/wireguard/config/
+infrastructure/vpn/**/*private*
+
+# Cloud credentials / Terraform state
+.terraform/
+*.tfstate*
+*.tfvars
+!*.tfvars.example
+.aws/
+
+# ---- build output, caches, local tooling ----
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+.DS_Store
+.idea/
+.vscode/
+.claude/

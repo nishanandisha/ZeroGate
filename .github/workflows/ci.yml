@@ -1,0 +1,64 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: ./scripts/pki.sh          # API tests read the generated certificates
+      - working-directory: backend
+        run: |
+          pip install -r requirements-dev.txt
+          ruff check app tests
+          python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - working-directory: frontend
+        run: npm ci && npm run build
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell scripts
+        run: shellcheck -S error scripts/*.sh infrastructure/pki/build-pki.sh infrastructure/*/*/entrypoint.sh testing/break-fix/run.sh
+      - name: Compose file
+        run: cp .env.example infrastructure/.env && docker compose -f infrastructure/docker-compose.yml config -q
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform
+        working-directory: infrastructure/cloud/terraform/aws
+        run: terraform fmt -check && terraform init -backend=false && terraform validate
+
+  lab-e2e:
+    # Builds the whole lab on the runner and runs the integration + break/fix suites.
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, infrastructure]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: make up
+      - name: Wait for the lab
+        run: |
+          for i in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' zerogate-saml-app-1)" = healthy ] && break; sleep 5
+          done; sleep 15
+      - run: cd testing && .venv/bin/python -m pytest
+      - run: make security
+      - run: make breakfix
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: break-fix-evidence, path: testing/reports/ }
+      - if: failure()
+        run: docker compose -f infrastructure/docker-compose.yml logs --tail 80

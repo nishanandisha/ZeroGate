@@ -1,0 +1,57 @@
+#!/bin/bash
+# zg - ZeroGate client helper.  zg up | down | status | test
+MODE=${MODE:-wireguard}; U=${LAB_USER:-alice}
+up_wg() {
+  ip link del wg0 2>/dev/null
+  ip link add wg0 type wireguard && wg setconf wg0 /wg/linux.conf && ip addr add 10.99.0.2/32 dev wg0 \
+   && ip link set wg0 mtu 1380 up && ip route add 10.10.0.0/24 dev wg0 && ip route add 10.20.0.0/24 dev wg0
+}
+up_ipsec() {
+  S=/etc/swanctl; mkdir -p $S/x509 $S/x509ca $S/private $S/conf.d
+  cp /pki/root-ca/root.crt /pki/intermediate-ca/issuing.crt $S/x509ca/
+  cp /pki/issued/ipsec-$U.crt $S/x509/ && cp /pki/issued/ipsec-$U.key $S/private/
+  cat > $S/conf.d/client.conf <<C
+connections {
+  zerogate {
+    version = 2
+    remote_addrs = 172.30.0.11
+    vips = 0.0.0.0
+    proposals = ${IKE_PROPOSALS:-aes256gcm16-prfsha384-ecp384}
+    local {
+      auth = pubkey
+      certs = ipsec-$U.crt
+      id = $U@zerogate.lab
+    }
+    remote {
+      auth = pubkey
+      id = vpn.zerogate.lab
+    }
+    children {
+      corp {
+        remote_ts = 10.10.0.0/24, 10.20.0.0/24
+        esp_proposals = ${ESP_PROPOSALS:-aes256gcm16-ecp384}
+      }
+    }
+  }
+}
+C
+  swanctl --stats >/dev/null 2>&1 || { rm -f /var/run/charon.*; /usr/lib/strongswan/charon > /var/log/charon.log 2>&1 & }
+  for i in $(seq 1 30); do swanctl --stats >/dev/null 2>&1 && break; sleep 0.5; done
+  swanctl --load-all >/dev/null && swanctl --initiate --child corp --timeout 15 2>&1 | tail -3
+}
+case "${1:-status}" in
+  up)     if [ "$MODE" = wireguard ]; then up_wg; else up_ipsec; fi; zg status;;
+  down)   if [ "$MODE" = wireguard ]; then ip link del wg0 2>/dev/null; else
+            # A half-open IKE SA can keep charon busy and ignoring SIGTERM; stop it firmly so `up` starts clean
+            swanctl --terminate --ike zerogate --force --timeout 3 >/dev/null 2>&1
+            killall -9 charon 2>/dev/null; sleep 1; rm -f /var/run/charon.*
+            ip xfrm state flush 2>/dev/null; ip xfrm policy flush 2>/dev/null
+          fi; echo down;;
+  status) echo "mode=$MODE user=$U"; if [ "$MODE" = wireguard ]; then wg show wg0 2>&1 | sed -n '1,12p'; else swanctl --list-sas 2>&1 | head -12; fi;;
+  test)
+    echo -n "ping app (10.10.0.40):         "; ping -c1 -W2 10.10.0.40 >/dev/null && echo OK || echo FAIL
+    echo -n "https app via tunnel:          "; curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 --resolve app.zerogate.lab:443:10.10.0.40 https://app.zerogate.lab/healthz || echo FAIL
+    echo -n "ldap blocked by policy:        "; nc -z -w 3 10.10.0.20 389 2>/dev/null && echo "OPEN (bad)" || echo "blocked (good)"
+    echo -n "web via SWG (inspected):       "; curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 -x http://$U:${LAB_USER_PASSWORD:?LAB_USER_PASSWORD is not set}@10.20.0.20:3128 https://example.com || echo FAIL
+    echo -n "issuer seen by client:         "; curl -sv --max-time 10 -x http://$U:${LAB_USER_PASSWORD:?LAB_USER_PASSWORD is not set}@10.20.0.20:3128 https://example.com -o /dev/null 2>&1 | grep -m1 'issuer:' | sed 's/.*issuer: //';;
+esac

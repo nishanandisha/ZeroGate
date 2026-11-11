@@ -1,0 +1,19 @@
+#!/bin/bash
+# Cloud-init: install Docker, clone the repo, start the lab with the public IP as the WireGuard endpoint.
+set -euxo pipefail
+apt-get update
+apt-get install -y ca-certificates curl git make python3-venv
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker ubuntu
+TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+sudo -u ubuntu git clone ${repo_url} /home/ubuntu/zerogate
+cd /home/ubuntu/zerogate
+cp .env.example infrastructure/.env
+# Replace every lab default secret with a random one on a cloud host
+for k in LDAP_ADMIN_PASSWORD LAB_USER_PASSWORD LDAP_KEYCLOAK_PASSWORD LDAP_SQUID_PASSWORD LDAP_CONSOLE_PASSWORD KEYCLOAK_ADMIN_PASSWORD; do
+  sed -i "s|^$k=.*|$k=$(openssl rand -base64 18 | tr -d '/+=')|" infrastructure/.env
+done
+sed -i "s|^WG_PUBLIC_ENDPOINT=.*|WG_PUBLIC_ENDPOINT=$PUBLIC_IP|" infrastructure/.env
+chown -R ubuntu:ubuntu /home/ubuntu/zerogate
+sudo -u ubuntu make up

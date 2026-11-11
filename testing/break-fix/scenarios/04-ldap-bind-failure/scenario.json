@@ -1,0 +1,7 @@
+{
+  "id": "04-ldap-bind-failure",
+  "ticket": "TKT-004",
+  "component": "Directory / IdP",
+  "title": "All logins fail with a server error after the IdP restarted",
+  "summary": "The LDAP service account password was changed days earlier. Keycloak kept working on pooled connections until a restart forced a fresh bind, which fails with LDAP error 49."
+}

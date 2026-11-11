@@ -1,0 +1,25 @@
+$ dc exec -T client-ipsec sh -c swanctl --list-sas | head -3; echo '(no SA listed above = not connected)'
+(no SA listed above = not connected)
+
+$ dc exec -T client-ipsec sh -c swanctl --initiate --child corp --timeout 10 2>&1 | tail -6
+initiate failed: establishing CHILD_SA 'corp' failed
+[ENC] generating IKE_SA_INIT request 0 [ SA KE No N(NATD_S_IP) N(NATD_D_IP) N(FRAG_SUP) N(HASH_ALG) N(REDIR_SUP) ]
+[NET] sending packet: from 172.30.0.101[500] to 172.30.0.11[500] (336 bytes)
+[NET] received packet: from 172.30.0.11[500] to 172.30.0.101[500] (36 bytes)
+[ENC] parsed IKE_SA_INIT response 0 [ N(NO_PROP) ]
+[IKE] received NO_PROPOSAL_CHOSEN notify error
+
+$ sh -c docker logs --since 1m zerogate-ipsec-gw-1 2>&1 | grep -E 'received proposals|configured proposals|no proposal|NO_PROP' | tail -4 | cut -c1-240
+08[CFG] received proposals: IKE:AES_CBC_128/HMAC_SHA1_96/PRF_HMAC_SHA1/MODP_1024
+08[CFG] configured proposals: IKE:AES_GCM_16_256/PRF_HMAC_SHA2_384/ECP_384, IKE:AES_CBC_256/HMAC_SHA2_256_128/PRF_HMAC_SHA2_256/MODP_2048, IKE:AES_CBC_256/HMAC_SHA2_256_128/PRF_HMAC_SHA2_256/ECP_256
+08[IKE] received proposals unacceptable
+08[ENC] generating IKE_SA_INIT response 0 [ N(NO_PROP) ]
+
+$ dc exec -T client-ipsec sh -c grep -E 'proposals' /etc/swanctl/conf.d/client.conf
+    proposals = aes128-sha1-modp1024
+        esp_proposals = aes256gcm16-ecp384
+
+$ dc exec -T ipsec-gw sh -c grep -E 'proposals' /etc/swanctl/conf.d/gateway.conf
+    proposals = aes256gcm16-prfsha384-ecp384, aes256-sha256-modp2048, aes256-sha256-ecp256
+        esp_proposals = aes256gcm16-ecp384, aes256-sha256-modp2048, aes256-sha256
+

@@ -1,0 +1,7 @@
+[tool.ruff]
+line-length = 125
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]
+ignore = ["B008", "B904"]
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning"]

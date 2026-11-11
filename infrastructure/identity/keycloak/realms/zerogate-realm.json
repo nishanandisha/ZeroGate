@@ -1,0 +1,121 @@
+{
+  "realm": "zerogate",
+  "displayName": "ZeroGate",
+  "enabled": true,
+  "sslRequired": "none",
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "loginWithEmailAllowed": true,
+  "registrationAllowed": false,
+  "eventsEnabled": true,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": ["LOGIN", "LOGIN_ERROR", "LOGOUT", "CODE_TO_TOKEN", "CODE_TO_TOKEN_ERROR"],
+  "adminEventsEnabled": true,
+  "components": {
+    "org.keycloak.storage.UserStorageProvider": [
+      {
+        "name": "corp-ldap",
+        "providerId": "ldap",
+        "subComponents": {
+          "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+            { "name": "username", "providerId": "user-attribute-ldap-mapper",
+              "config": { "ldap.attribute": ["uid"], "user.model.attribute": ["username"], "read.only": ["true"],
+                          "always.read.value.from.ldap": ["false"], "is.mandatory.in.ldap": ["true"] } },
+            { "name": "email", "providerId": "user-attribute-ldap-mapper",
+              "config": { "ldap.attribute": ["mail"], "user.model.attribute": ["email"], "read.only": ["true"],
+                          "always.read.value.from.ldap": ["false"], "is.mandatory.in.ldap": ["false"] } },
+            { "name": "first name", "providerId": "user-attribute-ldap-mapper",
+              "config": { "ldap.attribute": ["givenName"], "user.model.attribute": ["firstName"], "read.only": ["true"],
+                          "always.read.value.from.ldap": ["true"], "is.mandatory.in.ldap": ["true"] } },
+            { "name": "last name", "providerId": "user-attribute-ldap-mapper",
+              "config": { "ldap.attribute": ["sn"], "user.model.attribute": ["lastName"], "read.only": ["true"],
+                          "always.read.value.from.ldap": ["true"], "is.mandatory.in.ldap": ["true"] } },
+            { "name": "groups", "providerId": "group-ldap-mapper",
+              "config": { "groups.dn": ["ou=groups,dc=zerogate,dc=lab"], "group.name.ldap.attribute": ["cn"],
+                          "group.object.classes": ["groupOfNames"], "membership.ldap.attribute": ["member"],
+                          "membership.attribute.type": ["DN"], "membership.user.ldap.attribute": ["uid"],
+                          "mode": ["READ_ONLY"], "user.roles.retrieve.strategy": ["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],
+                          "preserve.group.inheritance": ["false"], "ignore.missing.groups": ["false"],
+                          "drop.non.existing.groups.during.sync": ["false"], "groups.path": ["/"] } }
+          ]
+        },
+        "config": {
+          "enabled": ["true"], "priority": ["0"], "editMode": ["READ_ONLY"], "vendor": ["other"],
+          "connectionUrl": ["ldap://10.10.0.20:389"], "connectionTimeout": ["5000"],
+          "usersDn": ["ou=people,dc=zerogate,dc=lab"], "searchScope": ["1"],
+          "usernameLDAPAttribute": ["uid"], "rdnLDAPAttribute": ["uid"], "uuidLDAPAttribute": ["entryUUID"],
+          "userObjectClasses": ["inetOrgPerson, organizationalPerson"],
+          "authType": ["simple"], "bindDn": ["cn=keycloak-svc,ou=services,dc=zerogate,dc=lab"],
+          "bindCredential": ["${LDAP_KEYCLOAK_PASSWORD}"],
+          "useTruststoreSpi": ["never"], "connectionPooling": ["true"], "pagination": ["false"],
+          "importEnabled": ["true"], "syncRegistrations": ["false"], "trustEmail": ["true"],
+          "batchSizeForSync": ["1000"], "fullSyncPeriod": ["-1"], "changedSyncPeriod": ["-1"], "cachePolicy": ["DEFAULT"]
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "https://localhost:8443/mellon/metadata",
+      "name": "ZeroGate Protected App (SAML)",
+      "protocol": "saml",
+      "enabled": true,
+      "baseUrl": "https://localhost:8443/",
+      "redirectUris": ["https://localhost:8443/*"],
+      "frontchannelLogout": true,
+      "attributes": {
+        "saml.client.signature": "false",
+        "saml.server.signature": "true",
+        "saml.assertion.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml.force.post.binding": "true",
+        "saml.authnstatement": "true",
+        "saml_name_id_format": "username",
+        "saml_force_name_id_format": "true",
+        "saml_assertion_consumer_url_post": "https://localhost:8443/mellon/postResponse",
+        "saml_single_logout_service_url_redirect": "https://localhost:8443/mellon/logout"
+      },
+      "protocolMappers": [
+        { "name": "groups", "protocol": "saml", "protocolMapper": "saml-group-membership-mapper",
+          "config": { "attribute.name": "groups", "attribute.nameformat": "Basic", "full.path": "false", "single": "true" } },
+        { "name": "email", "protocol": "saml", "protocolMapper": "saml-user-property-mapper",
+          "config": { "user.attribute": "email", "attribute.name": "email", "attribute.nameformat": "Basic" } },
+        { "name": "displayName", "protocol": "saml", "protocolMapper": "saml-user-property-mapper",
+          "config": { "user.attribute": "firstName", "attribute.name": "givenName", "attribute.nameformat": "Basic" } }
+      ]
+    },
+    {
+      "clientId": "zerogate-console",
+      "name": "ZeroGate Admin Console",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3300/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:3300", "http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:3300/*##http://localhost:5173/*" },
+      "protocolMappers": [
+        { "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+          "config": { "claim.name": "groups", "full.path": "false", "access.token.claim": "true", "id.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.custom.audience": "zerogate-api", "access.token.claim": "true", "id.token.claim": "false" } }
+      ]
+    },
+    {
+      "clientId": "zerogate-cli",
+      "name": "ZeroGate CLI / automated tests (lab only)",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        { "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+          "config": { "claim.name": "groups", "full.path": "false", "access.token.claim": "true", "id.token.claim": "true" } },
+        { "name": "api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+          "config": { "included.custom.audience": "zerogate-api", "access.token.claim": "true" } }
+      ]
+    }
+  ]
+}

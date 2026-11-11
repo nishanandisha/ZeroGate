@@ -1,0 +1,7 @@
+{
+  "id": "07-missing-intermediate",
+  "ticket": "TKT-007",
+  "component": "Proxy / PKI",
+  "title": "Certificate errors only on the DLP proxy; the main proxy is fine and the Root CA is installed",
+  "summary": "The DLP proxy does not send its intermediate (Inspection CA), so clients that trust only the Root cannot build the chain."
+}
