@@ -1,5 +1,7 @@
 # ZeroGate — Zero-Trust Access Lab
 
+[![ci](https://github.com/nishanandisha/ZeroGate/actions/workflows/ci.yml/badge.svg)](https://github.com/nishanandisha/ZeroGate/actions/workflows/ci.yml)
+
 A small, working copy of a commercial Security Service Edge (SSE) platform that runs on one laptop:
 a VPN, an HTTPS-inspecting proxy with DLP, and single sign-on, with an admin console on top and a
 library of break/fix support tickets that can each be reproduced with one command.
@@ -85,6 +87,10 @@ Measured on 2026-11-11 against the running lab (11 containers, Docker Desktop, A
 
 Also clean: `ruff` on the backend and the security tests, and the frontend type-check and production build.
 
+The same suites run in GitHub Actions on every push ([workflow](.github/workflows/ci.yml)): lint and unit
+tests, frontend build, shellcheck / compose / Terraform validation, then the whole lab is built from a
+clean clone and the integration, leak and break/fix suites run against it. All four jobs pass.
+
 **What the integration tests prove (30 cases)**
 
 | Area | Cases | Examples |
@@ -114,8 +120,8 @@ Full numbers, unit-test coverage (about 73% of `backend/app`) and captured evide
 [testing/reports/evidence/](testing/reports/evidence/).
 
 **Not covered by any test:** the frontend has no component or browser tests (pages were checked by hand);
-the Windows client scripts have never been run; the AWS Terraform is validated only, never applied; the
-GitHub Actions workflow has not yet been run; there is no load or concurrency testing.
+the Windows client scripts have never been run; the AWS Terraform is validated only, never applied;
+there is no load or concurrency testing.
 
 ## Security: what is checked so nothing leaks
 

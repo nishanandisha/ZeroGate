@@ -100,5 +100,4 @@ that each ticket is reproducible and how long a demo of it takes.
   captured as screenshots in `docs/screenshots/`.
 - Windows client PowerShell scripts: never run.
 - AWS Terraform: validated only, never applied.
-- GitHub Actions workflow: never run.
 - Load, performance and concurrency: not tested.
