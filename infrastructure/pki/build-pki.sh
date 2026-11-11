@@ -6,6 +6,7 @@ set -eu
 cd "$(dirname "$0")"
 command -v openssl >/dev/null || apk add --no-cache openssl >/dev/null
 
+mkdir -p root-ca intermediate-ca issued   # git-ignored, so absent on a fresh clone
 DOMAIN=${LAB_DOMAIN:-zerogate.lab}
 SUBJ_BASE="/C=US/O=ZeroGate Lab"
 
